@@ -130,7 +130,9 @@ int16_t network_read(const char *devicespec, uint8_t *buf, uint16_t len)
 #endif
 
 #if defined(__ATARI__)
+        // For Atari, we use interrupt-driven SIO read
         sio_read(unit, buf, fetch_size);
+        // The interrupt handler will update fn_bytes_read
 #elif defined(__APPLE2__)
         sp_read_nw(sp_network, fetch_size);
         memcpy(buf, sp_payload, fetch_size);

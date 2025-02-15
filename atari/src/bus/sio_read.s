@@ -4,6 +4,8 @@
         .import     _fn_bytes_read
         .import     _bus_status
         .import     _copy_network_cmd_data
+        .import     _sio_init_interrupts
+        .import     _sio_read_complete
         .import     popa
         .import     popax
 
@@ -18,6 +20,9 @@ _sio_read:
 
         axinto  _fn_bytes_read
 
+        ; Initialize interrupt system if not done
+        jsr     _sio_init_interrupts
+
         setax   #t_network_read
         jsr     _copy_network_cmd_data   ; setup DCB
 
@@ -28,7 +33,18 @@ _sio_read:
         stx     IO_DCB::dbythi
         sta     IO_DCB::daux1
         stx     IO_DCB::daux2
+
+        ; Clear read complete flag
+        lda     #0
+        sta     _sio_read_complete
+
+        ; Start the SIO operation
         jsr     _bus
+
+        ; Wait for completion flag
+@wait_loop:
+        lda     _sio_read_complete
+        beq     @wait_loop
 
         lda     IO_DCB::dunit           ; restore the unit
         jmp     _bus_status
