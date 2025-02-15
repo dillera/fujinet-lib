@@ -23,11 +23,11 @@
         tax
         ; mode for this unit (which is 1 based)
         lda     fn_open_mode_table-1, x
-        sta     tmp1
+        sta     tmp5
 
         ; set channel mode to json
         pusha   #$FC            ; cmd:  Set channel mode
-        pusha   tmp1            ; aux1: open-mode - NOT USED BY PIO
+        pusha   tmp5            ; aux1: open-mode - NOT USED BY PIO
         pusha   #$01            ; aux2: CHANNELMODE_JSON
         pushax  ptr1            ; devicespec
         pushax  #$00            ; dstats: none. this is varargs, so must be WORD
@@ -39,7 +39,7 @@
 
         ; call IOCTL with cmd P
         pusha   #'P'            ; cmd:  Parse
-        pusha   tmp1            ; aux1: read/write
+        pusha   tmp5            ; aux1: read/write
         pusha   #$00            ; aux2: no translation
         pushax  ptr1            ; devicespec
         pushax  #$00            ; dstats: none. this is varargs, so must be WORD

@@ -20,25 +20,36 @@ rx_buf:             .res 256 ; Receive buffer
 rx_buf_len:         .res 1   ; Number of bytes in receive buffer
 rx_buf_idx:         .res 1   ; Current index in receive buffer
 dvstat_buf:         .res 4   ; Local copy of DVSTAT
+_vserir_save:       .res 2   ; Save location for original VSERIR vector
+_pokmsk_save:       .res 1   ; Save location for original POKMSK value
 
 .segment "ZEROPAGE"
 _sio_buffer_ptr:      .res 2  ; Current buffer position
 _sio_bytes_left:      .res 2  ; Remaining bytes to read
-tmp1:               .res 1  ; Temporary storage
 
 .code
 
 ; Initialize SIO interrupts
 ; void sio_init_interrupts()
 .proc _sio_init_interrupts
-        ; Save old interrupt vectors if needed
-        
-        ; Set up our interrupt vectors
+        sei                     ; Mask interrupts
+
+        ; Save existing VSERIR vector
+        lda     VSERIR
+        sta     _vserir_save
+        lda     VSERIR+1
+        sta     _vserir_save+1
+
+        ; Set up our interrupt vector
         lda     #<_sio_interrupt_handler
         sta     VSERIR
         lda     #>_sio_interrupt_handler
         sta     VSERIR+1
         
+        ; Save current POKMSK value
+        lda     POKMSK
+        sta     _pokmsk_save
+
         ; Enable serial I/O interrupts
         lda     POKMSK
         ora     #%00100000      ; Serial input ready interrupt
@@ -50,6 +61,26 @@ tmp1:               .res 1  ; Temporary storage
         sta     rx_buf_len
         sta     rx_buf_idx
         
+        cli                     ; Re-enable interrupts
+        rts
+.endproc
+
+; Disable SIO interrupts and restore original vectors
+.proc _sio_disable_interrupts
+        sei                     ; Mask interrupts
+
+        ; Restore original VSERIR vector
+        lda     _vserir_save
+        sta     VSERIR
+        lda     _vserir_save+1
+        sta     VSERIR+1
+
+        ; Restore original POKMSK value
+        lda     _pokmsk_save
+        sta     POKMSK
+        sta     IRQEN
+
+        cli                     ; Re-enable interrupts
         rts
 .endproc
 
@@ -85,6 +116,12 @@ tmp1:               .res 1  ; Temporary storage
         lda     IRQST
         and     #%00100000
         beq     @not_our_irq
+
+        ; Re-enable the interrupt (it gets disabled as acknowledgment)
+        lda     POKMSK
+        ora     #%00100000      ; Serial input ready interrupt
+        sta     POKMSK
+        sta     IRQEN
 
         ; First check if we have space in our receive buffer
         lda     rx_buf_len

@@ -89,11 +89,11 @@ no_data:
         rts
 
 error:
-        sta     tmp1            ; save error code
+        sta     tmp5            ; save error code
         jsr     add_nul         ; sets the string to empty
         ; make the error negative
         ldx     #$00
-        lda     tmp1
+        lda     tmp5
         jmp     negax
 
 add_nul:
@@ -103,4 +103,3 @@ add_nul:
         rts
 
 .endproc
-
