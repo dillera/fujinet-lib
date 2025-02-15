@@ -5,7 +5,7 @@
 
 # TARGETS = atari c64 apple2 apple2enh apple2gs coco
 # TARGETS = pmd85
-TARGETS = msdos
+TARGETS = atari
 PROGRAM := fujinet.lib
 
 SUB_TASKS := clean disk test release

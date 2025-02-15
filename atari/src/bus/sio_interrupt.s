@@ -1,6 +1,8 @@
 .export     _sio_init_interrupts
 .export     _sio_interrupt_handler
 .export     _sio_read_complete
+.export     _sio_buffer_ptr
+.export     _sio_bytes_left
 
 .import     _fn_bytes_read
 .import     popax
@@ -9,14 +11,16 @@
 .include    "device.inc"
 .include    "zp.inc"
 
-; Interrupt vector locations
-VSERIR = $0206        ; Serial Input Ready vector
-VSEROC = $0208        ; Serial Output Complete vector
+; Hardware addresses for Atari SIO
+VSERIR          = $0206        ; Serial Input Ready vector
 
-.bss
+.segment "BSS"
 _sio_read_complete:   .res 1  ; Flag to indicate read completion
+
+.segment "ZEROPAGE"
 _sio_buffer_ptr:      .res 2  ; Current buffer position
 _sio_bytes_left:      .res 2  ; Remaining bytes to read
+tmp1:               .res 1  ; Temporary storage
 
 .code
 
