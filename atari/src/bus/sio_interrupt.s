@@ -16,6 +16,10 @@ VSERIR          = $0206        ; Serial Input Ready vector
 
 .segment "BSS"
 _sio_read_complete:   .res 1  ; Flag to indicate read completion
+rx_buf:             .res 256 ; Receive buffer
+rx_buf_len:         .res 1   ; Number of bytes in receive buffer
+rx_buf_idx:         .res 1   ; Current index in receive buffer
+dvstat_buf:         .res 4   ; Local copy of DVSTAT
 
 .segment "ZEROPAGE"
 _sio_buffer_ptr:      .res 2  ; Current buffer position
@@ -40,7 +44,32 @@ tmp1:               .res 1  ; Temporary storage
         ora     #%00100000      ; Serial input ready interrupt
         sta     POKMSK
         sta     IRQEN
+
+        ; Initialize our buffers
+        lda     #0
+        sta     rx_buf_len
+        sta     rx_buf_idx
         
+        rts
+.endproc
+
+; Save current DVSTAT values
+.proc save_dvstat
+        ldx     #3
+@loop:  lda     DVSTAT,x
+        sta     dvstat_buf,x
+        dex
+        bpl     @loop
+        rts
+.endproc
+
+; Restore DVSTAT values
+.proc restore_dvstat
+        ldx     #3
+@loop:  lda     dvstat_buf,x
+        sta     DVSTAT,x
+        dex
+        bpl     @loop
         rts
 .endproc
 
@@ -57,12 +86,30 @@ tmp1:               .res 1  ; Temporary storage
         and     #%00100000
         beq     @not_our_irq
 
-        ; Read the byte from SERIN
+        ; First check if we have space in our receive buffer
+        lda     rx_buf_len
+        cmp     #255           ; Check against 255 instead of 256
+        beq     @buffer_full
+
+        ; Read the byte from SERIN into receive buffer
+        ldx     rx_buf_len
         lda     SERIN
+        sta     rx_buf,x
+        inc     rx_buf_len
+
+        ; If we have pending read request, process it
+        lda     _sio_bytes_left
+        ora     _sio_bytes_left+1
+        beq     @no_pending_read
+
+        ; Copy byte from receive buffer to target buffer
+        ldx     rx_buf_idx
+        lda     rx_buf,x
         ldy     #0
         sta     (_sio_buffer_ptr),y
 
-        ; Increment buffer pointer
+        ; Update buffer pointers
+        inc     rx_buf_idx
         inc     _sio_buffer_ptr
         bne     @no_carry
         inc     _sio_buffer_ptr+1
@@ -75,16 +122,19 @@ tmp1:               .res 1  ; Temporary storage
 @dec_low:
         dec     _sio_bytes_left
         
-        ; Check if we're done
+        ; Check if we're done with current read
         lda     _sio_bytes_left
         ora     _sio_bytes_left+1
         bne     @not_done
         
-        ; Set completion flag
+        ; Set completion flag and save status
         lda     #1
         sta     _sio_read_complete
+        jsr     save_dvstat
 
 @not_done:
+@no_pending_read:
+@buffer_full:
 @not_our_irq:
         pla                     ; Restore registers
         tay
